@@ -5,7 +5,7 @@ Déployé sur OpenShift, connecté à PostgreSQL
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional
 import psycopg2
 import psycopg2.extras
