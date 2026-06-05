@@ -1,0 +1,86 @@
+# openshift-backend.yaml
+# kubectl apply -f openshift-backend.yaml
+# oc apply -f openshift-backend.yaml
+
+---
+# 1. Secret PostgreSQL
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+type: Opaque
+stringData:
+  POSTGRES_HOST: postgresql       # nom du service PostgreSQL dans le namespace
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: clouddemo
+  POSTGRES_USER: clouddemo_user
+  POSTGRES_PASSWORD: motdepassesecret  # ← changez ceci !
+
+---
+# 2. Déploiement FastAPI
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clouddemo-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clouddemo-backend
+  template:
+    metadata:
+      labels:
+        app: clouddemo-backend
+    spec:
+      containers:
+        - name: api
+          image: image-registry.openshift-image-registry.svc:5000/VOTRE_NAMESPACE/clouddemo-backend:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          env:
+            - name: FRONTEND_URL
+              value: "https://votre-app.vercel.app"  # ← URL Vercel
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+# 3. Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: clouddemo-backend-svc
+spec:
+  selector:
+    app: clouddemo-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+
+---
+# 4. Route OpenShift (exposition externe HTTPS)
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: clouddemo-backend-route
+spec:
+  to:
+    kind: Service
+    name: clouddemo-backend-svc
+  port:
+    targetPort: 8000
+  tls:
+    termination: edge       # HTTPS automatique
+    insecureEdgeTerminationPolicy: Redirect
